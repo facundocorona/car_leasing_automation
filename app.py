@@ -31,7 +31,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
   
-    path_statics = ".\\Script\\Statics_file\\"
+    path_statics = ".\\Statics_file\\"
 
 
     df_usa = pd.read_excel(path_statics + 'USA CC APPROACH.xlsx')
