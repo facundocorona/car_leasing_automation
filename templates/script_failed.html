@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Car Leasing Report
+{% endblock %}
+
+{% block content %}
+
+<h1 style="color: #0091c8; font-family: Arial, Helvetica, sans-serif;"> There is some error in the format of one or more of the files uploaded. Please check and contact the owner</h1>
+
+<form action="/return" method="POST">
+
+
+    <button class="button" type="image" value="goback"> 
+        <img src= "{{url_for ('static', filename = './home.png')}}"/>
+    </button>
+
+
+</form>
+
+{% endblock %}

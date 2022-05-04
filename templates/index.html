@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Car Leasing Report
+{% endblock %}
+
+{% block content %}
+
+<h1 style="color: #0091c8; font-family: Arial, Helvetica, sans-serif;">Welcome to the Bayer Car Leasing Automation</h1>
+<h2 style="color: #ccc; font-family: Arial, Helvetica, sans-serif;">Please browse the requeired files and process it</h2>
+
+<form action="/outputfile" method="POST" style="display: inline-block;" enctype="multipart/form-data">
+
+
+    <label for="fleet_report"> Fleet Report </label>
+    <input type="file" name="fleet_report" style="
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;">
+
+
+
+    <label for="query_folder"> Query </label>
+    <input type="file" name="query_folder" id="files" multiple="" directory="" webkitdirectory="" mozdirectory=""  style="
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;">
+    
+
+
+    <label for="le_report"> GDIS Report </label>
+    <input type="file" name="le_report"  style="
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;">
+
+
+
+
+    <label for="currency_report"> CofiPot Report </label>
+    <input type="file" name="currency_report"  style="
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;">
+
+
+
+    <label for="fie_report"> FIE Report </label>
+    <input type="file" name="fie_report"  style="
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;">   
+
+
+    <input class="button" type="submit" value="Upload" style="  width: 100%;
+    background-color: #04AA6D;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;"/>
+
+
+  
+
+</form>
+
+
+{% endblock %}
+
+
+
+
+
+
+
+
+ 
