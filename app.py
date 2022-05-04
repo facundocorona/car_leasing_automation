@@ -17,7 +17,7 @@ from werkzeug.exceptions import HTTPException
 def process_data(df_query, df, df_currency, df_le, df_cost_center):
     pass
     base_month = date.today().month - 1
-    if date.today().month < 15:
+    if date.today().day < 15:
         base_month = date.today().month - 2
     
     
