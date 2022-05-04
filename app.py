@@ -17,12 +17,17 @@ from werkzeug.exceptions import HTTPException
 def process_data(df_query, df, df_currency, df_le, df_cost_center):
     pass
     base_month = date.today().month - 1
+    if date.today().month < 15:
+        base_month = date.today().month - 2
+    
+    
     if base_month == 0:
         currentMonth = '12'
         currentYear = str(date.today().year - 1)
     else:
         currentMonth = str(base_month).zfill(2)
         currentYear = str(date.today().year)
+     
 
 
     payment_col = calendar.month_abbr[date.today().month].upper() + ' ' + str(date.today().year)
