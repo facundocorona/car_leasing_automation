@@ -568,7 +568,10 @@ def uploader():
 
         writer.save()
         writer.close()              
-
+        
+        
+        return render_template('output_page.html')
+        """
         r = make_response(out.getvalue())
 
         r.headers["Content-Disposition"] = "attachment; filename=Cars_Report_ToAsk.xlsx"
@@ -576,7 +579,7 @@ def uploader():
 
         return  r
 
-        """
+        
         return render_template('output_page.html', new_cars=new_cars, old_cars_final=old_cars_final) 
         
         
