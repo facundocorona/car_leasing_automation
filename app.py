@@ -13,21 +13,22 @@ import io
 import calendar
 from werkzeug.exceptions import HTTPException
 
+
 ##############################################################################################################################################################################
 def process_data(df_query, df, df_currency, df_le, df_cost_center):
     pass
     base_month = date.today().month - 1
-    if date.today().day < 15:
+    version_ = "V.1"
+    if date.today().day < 22:
         base_month = date.today().month - 2
-    
-    
+        version_ = "V.2"
+        
     if base_month == 0:
         currentMonth = '12'
         currentYear = str(date.today().year - 1)
     else:
         currentMonth = str(base_month).zfill(2)
         currentYear = str(date.today().year)
-     
 
 
     payment_col = calendar.month_abbr[date.today().month].upper() + ' ' + str(date.today().year)
@@ -36,7 +37,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
   
-    path_statics = ".\\Statics_file\\"
+    path_statics = ".\\Script\\Statics_file\\"
 
 
     df_usa = pd.read_excel(path_statics + 'USA CC APPROACH.xlsx')
@@ -45,7 +46,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
-
+    
     
     # ## Give the correct format to the columns
     # give format to query
@@ -194,9 +195,8 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     df['Currency'] = np.where(((df['Country'] == 'CL') & (df['Currency'] == 'CPL')), 'CLP', df['Currency'])
 
 
+    #convert payments in EUR and then check if are higher than 1k, also checking the VIN lenght and currency for British cars
     df['Payments (monthly) in EUR'] = df['Payments (monthly)'] / [currency_dict[x] if ((x != 'EUR') & (x != 'na')) else 1 for x in df['Currency']]
-
-
     df['GB Car not in GBP'] = np.where((df['Country'] == 'GB') & (df['Currency'] != 'GBP'), 'X', '')
     df['Amount higher than 1K'] = np.where((df['Payments (monthly) in EUR'] > 1000) & (df['Currency'] != 'na'), 'X', '')
     df['Wrong VIN'] = np.where((df['VIN'].apply(lambda x: len(x) < 17)) & (-df['Country'].isin(['TW', 'PK', 'PE', 'PH', 'MA'])), 'X', '')
@@ -227,7 +227,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     # ### Combine with Query
 
 
-    df_query['LE_VIN'] = df_query['Legal Entity'] + '_' +df_query['VIN']  
+    df_query['LE_VIN'] = df_query['Legal Entity'] + '_' + df_query['VIN']  
 
 
     # combine with vin and LE
@@ -254,6 +254,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     # Take out those vehicules with null cc, company code o payments --> New Cars
     #new_cars = new_cars[-((new_cars['Company Code'].isnull()) | (new_cars['Cost Center'].isnull()) | (new_cars['Payments (monthly)'].isnull()))]
+
 
     
     # # NEW CARS MANIPULATION
@@ -332,11 +333,13 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
+    monsanto_cc_list = ['2600', '2601', '2602', '2603', '2604', '2606', '2608', '2609', '2610', '2611', '2613', '2614', '2615', '2616', '2617', '2618', '2619', '2620', '2621', '2622', '2624', '2625', '2626', '2628', '2629', '2630', '2631', '2632', '2633', '2634', '2635', '2637', '2638', '2640', '2641', '2642', '2643', '2644', '2645', '2646', '2647', '2648', '2649', '2650', '2651', '2653', '2654', '2656', '2657', '2658', '2659', '2660', '2661', '2662', '2663', '2664', '2665', '2666', '2667', '2668', '2669', '2670', '2671', '2672', '2673', '2674', '2675', '2676', '2677', '2678', '2680', '2681', '2682', '2683', '2684', '2685', '2687', '2688', '2689', '2690', '2694', '2723', '2724', '2725', '2726', '2730', '2740', '2741', '2744', '2745', '2746', '2747']
 
     new_cars['Non existing Company Code'] = np.where(new_cars['Company Code'].isin(df_le_valid['CCode']), "", np.where(new_cars['Null Company Code'] == "X", "", "X"))
 
-    new_cars['Company Code'] =  np.where((new_cars['Country'] != 'US') & (new_cars['Company Code'].str[:2] == '26'), "D" + new_cars['Company Code'], new_cars['Company Code'])
-    new_cars['Company Code'] =  np.where((new_cars['Country'] != 'US') & (new_cars['Company Code'].str[:2] == '27'), "D" + new_cars['Company Code'], new_cars['Company Code'])
+
+    new_cars['Company Code'] =  np.where(new_cars['Company Code'].isin(monsanto_cc_list), "D" + new_cars['Company Code'], new_cars['Company Code'])
+
 
     
     # 
@@ -373,7 +376,8 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
     # delete those car not active (leaving those that doesn't match by cocode)
-    old_cars = old_cars[(((old_cars['Status in H2R'] == 'active') | old_cars['Status in H2R'].isnull()) & (old_cars['Company Code'] != '0nan'))]
+
+    old_cars = old_cars[((old_cars['Status in H2R'] == 'active') | old_cars['Status in H2R'].isnull())]
 
 
     # refill those null values
@@ -429,6 +433,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     old_cars['Differences of CC'] = np.where(old_cars['Company Code'] == '2000', 'ok', old_cars['Differences of CC'])
     old_cars['Diff LE'] = np.where(old_cars['LE from H2R'] == old_cars['FLIX LE'], 'ok', 'probably transfer')
     old_cars['Diff LE'] = np.where(old_cars['Country'] == 'DE', 'ok', old_cars['Diff LE'])
+    old_cars['Diff LE'] = np.where(old_cars['FLIX LE'] == '0nan', 'N/A', old_cars['Diff LE'])
 
 
     # corrections columns
@@ -443,6 +448,9 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     flix_condition = (((old_cars['FLIX End Date'].dt.month <= datetime.datetime.now().month) & (old_cars['FLIX End Date'].dt.year == datetime.datetime.now().year)) | (old_cars['FLIX End Date'].dt.year < datetime.datetime.now().year))
     old_cars['Correction end date'] = np.where(abs(old_cars['Differences End Date in days']) > 31 , 'yes', np.where(abs(old_cars['Differences End Date in days']) == 0 , 'N/A', 'N/A difference below 1 month'))
     old_cars['Correction end date'] = np.where((h2r_condition) & (flix_condition), 'N/A ended in the past', old_cars['Correction end date'])
+    old_cars['Correction end date'] = np.where(old_cars['Differences End Date in days'] == 0, 'N/A', old_cars['Correction end date'])
+
+
 
     # consolidate
     old_cars['Correction should be done'] = old_cars['Correction end date']
@@ -453,7 +461,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
     #last column for user
-    old_cars['LE'] = old_cars['LE from H2R']
+    old_cars['LE'] = np.where(old_cars['FLIX LE'] == '0nan', old_cars['LE from H2R'], old_cars['FLIX LE'])
     old_cars['FO action'] = ''
     old_cars['User'] = ''
     old_cars['Correction done'] = ''
@@ -465,13 +473,18 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
     # assign SSC
-    old_cars['LE'] =  np.where((old_cars['Country'] != 'US') & (old_cars['LE'].str[:2] == '26'), "D" + old_cars['LE'], old_cars['LE'])
-    old_cars['LE'] =  np.where((old_cars['Country'] != 'US') & (old_cars['LE'].str[:2] == '27'), "D" + old_cars['LE'], old_cars['LE'])
-    old_cars['LE'] =  np.where(old_cars['LE'] == '2681', "D" + old_cars['LE'], old_cars['LE'])
 
 
+    old_cars['LE'] =  np.where(old_cars['LE'].isin(monsanto_cc_list), "D" + old_cars['LE'], old_cars['LE'])
 
-    old_cars = old_cars.merge(df_ssc[['LE', 'SSC']], how='left', left_on= 'LE', right_on= 'LE', copy=False)
+    df_ssc = df_ssc[['LE', 'SSC']]
+    df_ssc.drop_duplicates(keep='first', inplace=True, ignore_index=True)
+
+    old_cars = old_cars.merge(df_ssc, how='left', left_on= 'LE', right_on= 'LE', copy=False)
+
+    old_cars['LE'] = np.where(((old_cars['Monsanto_Bayer'] == 'Monsanto') & ((old_cars['SSC'].isnull()))), 'D'  + old_cars['LE from H2R'], old_cars['LE'])
+    del(old_cars['SSC'])
+    old_cars = old_cars.merge(df_ssc, how='left', left_on= 'LE', right_on= 'LE', copy=False)
 
 
     # delete blank spaces for cc
@@ -481,9 +494,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
     old_cars_final = old_cars[['Brand', 'Car Policy Type', 'Contract Start Date', 'Contract End Date', 'Contract Status', 'Contract Duration(Months)', 'Cost Center', 'Division / Subgroup', 'License Number', 'Model', 'Payments (monthly)', 'Currency', 'VIN', 'Country', 'Lessor', 'Company Code', 'Legal Entity', 'NewOldMarker', 'Monsanto_Bayer', 'System in H2R', 'Status in H2R', 'VIN Bayer in Monsanto H2R report (P08)', 'VIN Monsanto in Bayer H2R report', 'Base rent in H2R', 'FLIX Base rent', 'Diff Base rent', 'Diff Base rent to EUR', 'End date from H2R', 'FLIX End Date', 'Differences End Date in days', 'Currency FLIX', 'Currency in H2R', 'check currency', 'Cost Center in H2R', 'FLIX CC', 'Differences of CC', 'FLIX LE', 'LE from H2R', 'Diff LE', 'Correction base rent', 'Correction end date', 'Correction should be done', 'LE', 'SSC', 'FO action', 'User', 'Correction done', 'type of correction', 'IBR change']]
-
- 
-
+   
 
     return new_cars, old_cars_final, currentMonth, currentYear
 
@@ -514,6 +525,7 @@ def uploader():
         df_query = pd.DataFrame()
         fo = request.files.getlist('query_folder')
         for  i in fo:
+            #data_ = pd.read_excel(i, engine='openpyxl')
             data_ = pd.read_excel(i)
             df_query = df_query.append(data_)
         df_le = request.files['le_report']
@@ -526,11 +538,10 @@ def uploader():
         
 
         new_cars, old_cars_final, currentMonth, currentYear = process_data(df_query=df_query, df=df, df_currency=df_currency, df_le=df_le, df_cost_center=df_cost_center)
-        myoutput = currentMonth + "." + currentYear + " Cars Report ToAsk.xlsx"
+      
         out = io.BytesIO()
-        writer = pd.ExcelWriter(out, engine='xlsxwriter', datetime_format='yyyy-mm-dd')
-        
 
+        writer = pd.ExcelWriter(out, engine='xlsxwriter', datetime_format='yyyy-mm-dd')
         
         new_cars.to_excel(writer, index=False, header=True, sheet_name='New Cars')
         old_cars_final.to_excel(writer, index=False, header=True, sheet_name='Corrections')
@@ -556,20 +567,72 @@ def uploader():
 
 
         writer.save()
-        writer.close()
+        writer.close()              
 
-   
         r = make_response(out.getvalue())
-
-        print(f'New file created. {myoutput} has been generated.')
 
         r.headers["Content-Disposition"] = "attachment; filename=Cars_Report_ToAsk.xlsx"
         r.headers["Content-type"] = "application/x-xls"
 
         return  r
 
+        """
+        return render_template('output_page.html', new_cars=new_cars, old_cars_final=old_cars_final) 
+        
+        
+        r = make_response(out.getvalue())
+
+        
+
+        r.headers["Content-Disposition"] = "attachment; filename=Cars_Report_ToAsk.xlsx"
+        r.headers["Content-type"] = "application/x-xls"
+
+        return  r 
+        """
+
+"""
+@app.route("/output_download", methods=['POST'])
+def Download(new_cars, old_cars_final):
+    if request.method == "POST":
+
+        out = io.BytesIO()
+
+        writer = pd.ExcelWriter(out, engine='xlsxwriter', datetime_format='yyyy-mm-dd')
+        
+        new_cars.to_excel(writer, index=False, header=True, sheet_name='New Cars')
+        old_cars_final.to_excel(writer, index=False, header=True, sheet_name='Corrections')
 
 
+        # Get the dimensions of the dataframe
+        (max_row_old, max_col_old) = old_cars_final.shape
+        (max_row_new, max_col_new) = new_cars.shape
+
+        # Make the columns wider for clarity.
+        writer.sheets['New Cars'].set_column(0,  max_col_new - 1, 20)
+        writer.sheets['Corrections'].set_column(0,  max_col_old - 1, 20)
+
+
+        # Set the autofilter.
+        writer.sheets['Corrections'].autofilter(0, 0, max_row_old, max_col_old - 1)
+        writer.sheets['New Cars'].autofilter(0, 0, max_row_new, max_col_new - 1)
+
+
+        # Number format
+        format1 = writer.book.add_format({'num_format': '0.00'})
+        writer.sheets['Corrections'].set_column('AA:AA', None, format1)
+
+
+        writer.save()
+        writer.close()              
+
+        r = make_response(out.getvalue())
+
+        r.headers["Content-Disposition"] = "attachment; filename=Cars_Report_ToAsk.xlsx"
+        r.headers["Content-type"] = "application/x-xls"
+
+        return  r
+
+"""
 
 @app.errorhandler(404)
 def page_not_found(err):
@@ -584,6 +647,7 @@ def handle_exception(e):
         return e
     # now you're handling non-HTTP exceptions only
     return render_template("script_failed.html", e=e), 500
+
 
 
 if __name__ == '__main__':
