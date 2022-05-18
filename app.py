@@ -525,8 +525,8 @@ def uploader():
         df_query = pd.DataFrame()
         fo = request.files.getlist('query_folder')
         for  i in fo:
-            #data_ = pd.read_excel(i, engine='openpyxl')
-            data_ = pd.read_excel(i)
+            data_ = pd.read_excel(i, engine='openpyxl')
+            #data_ = pd.read_excel(i)
             df_query = df_query.append(data_)
         df_le = request.files['le_report']
         df_le = pd.read_excel(df_le, header = 10)
