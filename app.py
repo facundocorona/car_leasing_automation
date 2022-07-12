@@ -16,7 +16,6 @@ from werkzeug.exceptions import HTTPException
 
 ##############################################################################################################################################################################
 def process_data(df_query, df, df_currency, df_le, df_cost_center):
-    pass
     base_month = date.today().month - 1
     version_ = "V.1"
     if date.today().day < 22:
@@ -51,6 +50,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     # ## Give the correct format to the columns
     # give format to query
     relevant_col_query = ['VIN', 'Legal Entity', 'Status', 'AssetNumber', 'SAP Cost Center', 'System', 'Start Date', 'End Date', 'Currency', payment_col]
+    
     cell_range = range(50)
     for  i in cell_range: 
         if str(df_query.iloc[i, 3]) != 'nan':
@@ -125,12 +125,6 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     
     # ### Look for missing values
 
-
-    #df['CC missing'] = np.where(df['Cost Center'].isnull(), 'X', '')
-    #df['Payments in EUR'] = df['Payments (monthly)'] / [currency_dict[x] if x != 'EUR' else 1 for x in df['Currency']]
-
-    #df['Payments missing / below 50'] = np.where((df['Payments (monthly)'].isnull()) | (df['Payments (monthly)'] <= 50), 'X', '')
-
     df['Payments missing'] = np.where((df['Payments (monthly)'].isnull()) | (df['Payments (monthly)'] <= 0), 'X', '')
 
 
@@ -156,6 +150,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     df_ag['VIN'] = df_ag['Contract ID'].str[-17:]
     df = df[-df['VIN'].isin(df_ag['VIN'])]
 
+
     
     # ### Removing values
 
@@ -168,7 +163,6 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     df['Contract Start Date'][(df['Contract Start Date'] < '2021-01-01') & (df['Country'] == 'CA')] = datetime.datetime(2021, 1, 1)
     df['Contract Start Date'][(df['Contract Start Date'] < '2020-09-01') & (df['Country'] == 'HU')] = datetime.datetime(2020, 9, 1)
     df['Contract Start Date'][(df['Contract Start Date'] < '2021-02-01') & (df['Country'] == 'AU')] = datetime.datetime(2021, 2, 1)
-
 
 
 
@@ -185,7 +179,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     df['Cost Center'][df['Company Code'] == '0201'] = 'SZBSCS9007'
     df['Cost Center'][df['Company Code'] == '1611'] = 'VQ62600002'
-    df['Cost Center'][df['Company Code'] == '1994'] = '6Z90910002' 
+    df['Cost Center'][df['Company Code'] == '1994'] = '6Z90910002'
 
     
     # #### Check currency and amounts
@@ -199,7 +193,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     df['Payments (monthly) in EUR'] = df['Payments (monthly)'] / [currency_dict[x] if ((x != 'EUR') & (x != 'na')) else 1 for x in df['Currency']]
     df['GB Car not in GBP'] = np.where((df['Country'] == 'GB') & (df['Currency'] != 'GBP'), 'X', '')
     df['Amount higher than 1K'] = np.where((df['Payments (monthly) in EUR'] > 1000) & (df['Currency'] != 'na'), 'X', '')
-    df['Wrong VIN'] = np.where((df['VIN'].apply(lambda x: len(x) < 17)) & (-df['Country'].isin(['TW', 'PK', 'PE', 'PH', 'MA'])), 'X', '')
+    df['Wrong VIN'] = np.where((df['VIN'].apply(lambda x: len(x) < 17)) & (-df['Country'].isin(['TW', 'PK', 'PE', 'PH', 'MA', 'BD'])), 'X', '')
     del(df['Payments (monthly) in EUR'])
 
 
@@ -238,7 +232,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     df['Exact Car Exist in H2R'] = np.where(df['VIN'].isin(vin_list), "X", "")
 
-    #df['Exact Car Exist in H2R'] = np.where((df['Company Code'] + '_' + df['VIN']).isin(le_vin_list), "X", "")
+   
 
 
     # Here I create a new DF with those that not appear in the query
@@ -286,15 +280,16 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     new_cars = new_cars.merge(df_cost_center, how='left', left_on='VIN', right_on='VIN_No')
     new_cars['Wrong_Cost_Center'] = np.where((new_cars['Country'] == 'DE') & -(new_cars['Cost_Center_Car'].isin(cc_list_DE)), "X", '')
-    new_cars['Wrong_Cost_Center'] = np.where(new_cars['Cost Center'].isnull(), "X", new_cars['Wrong_Cost_Center'])
     new_cars['Cost Center'] = np.where((new_cars['Country'] == 'DE') & (new_cars['Wrong_Cost_Center'] == ''), new_cars['Cost_Center_Car'], new_cars['Cost Center'])
-    #new_cars['Wrong_Cost_Center'] = np.where(new_cars['Country'] == 'DE', "", new_cars['Wrong_Cost_Center'])
+    # next code was moved from aboce the code that replace the cost center column, just in case something wird happen this could be the cause
+    new_cars['Wrong_Cost_Center'] = np.where(new_cars['Cost Center'].isnull(), "X", new_cars['Wrong_Cost_Center'])
+
 
     del(new_cars['VIN_No'])
     del(new_cars['Cost_Center_Car'])
     del(new_cars['Exact Car Exist in H2R'])
 
-
+   
     # Assign division based on CC
     new_cars['new division'] = new_cars[new_cars['Wrong_Cost_Center'] == ""]['Cost Center'].map(cc_dict_DE)
     new_cars['Division / Subgroup'] = np.where(new_cars['new division'].isnull(), new_cars['Division / Subgroup'], new_cars['new division'])
@@ -305,11 +300,11 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(new_cars['new division'])
     #new_cars['Wrong Division'] = np.where(new_cars['Division / Subgroup'].isin(available_division), "", "X")
 
-
+   
     # delete blank spaces for cc
     new_cars['Cost Center'] = new_cars['Cost Center'].replace(' ', '', regex=True)
 
-
+   
     # define Wrong LE in Report
 
 
@@ -325,7 +320,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     del(new_cars['cc_2digits'])
 
-
+   
     # Last changes in company code
 
     new_cars['Company Code'] =  np.where((new_cars['Country'] == 'DE') & (new_cars["Monsanto_Bayer"] != 'Monsanto'), '2000', new_cars['Company Code'])
@@ -333,6 +328,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
+   
     monsanto_cc_list = ['2600', '2601', '2602', '2603', '2604', '2606', '2608', '2609', '2610', '2611', '2613', '2614', '2615', '2616', '2617', '2618', '2619', '2620', '2621', '2622', '2624', '2625', '2626', '2628', '2629', '2630', '2631', '2632', '2633', '2634', '2635', '2637', '2638', '2640', '2641', '2642', '2643', '2644', '2645', '2646', '2647', '2648', '2649', '2650', '2651', '2653', '2654', '2656', '2657', '2658', '2659', '2660', '2661', '2662', '2663', '2664', '2665', '2666', '2667', '2668', '2669', '2670', '2671', '2672', '2673', '2674', '2675', '2676', '2677', '2678', '2680', '2681', '2682', '2683', '2684', '2685', '2687', '2688', '2689', '2690', '2694', '2723', '2724', '2725', '2726', '2730', '2740', '2741', '2744', '2745', '2746', '2747']
 
     new_cars['Non existing Company Code'] = np.where(new_cars['Company Code'].isin(df_le_valid['CCode']), "", np.where(new_cars['Null Company Code'] == "X", "", "X"))
@@ -349,6 +345,8 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
     # add cost center to LE 2000
+    old_cars['Company Code'] =  np.where((old_cars['Country'] == 'DE') & (old_cars["Monsanto_Bayer"] != 'Monsanto'), '2000', old_cars['Company Code'])
+
     old_cars = old_cars.merge(df_cost_center, how='left', left_on='VIN', right_on='VIN_No')
 
     old_cars['Cost Center'] = np.where(((old_cars['Company Code'] == '2000') & (old_cars['Cost_Center_Car'].isin(cc_list_DE))), old_cars['Cost_Center_Car'], old_cars['Cost Center'])
@@ -359,7 +357,11 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(old_cars['Cost_Center_Car'])
     del(old_cars['VIN_No'])
 
+    
+    #replace 6011 with 2611
+    old_cars['Company Code']= np.where(old_cars['Company Code'] == '6011', '2611', old_cars['Company Code'])
 
+    
     old_cars['LE_VIN'] = old_cars['Company Code'] + '_' + old_cars['VIN'] 
 
     df_query_tomerge = df_query[['VIN', 'LE_VIN', 'Legal Entity', 'Status', 'SAP Cost Center', 'End Date', 'Payments', 'Currency', 'System']]
@@ -374,12 +376,12 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
-
+    
     # delete those car not active (leaving those that doesn't match by cocode)
 
     old_cars = old_cars[((old_cars['Status in H2R'] == 'active') | old_cars['Status in H2R'].isnull())]
 
-
+    
     # refill those null values
     null_values_old_cars = old_cars[old_cars['Status in H2R'].isnull()]
     old_cars = old_cars[-(old_cars['Status in H2R'].isnull())]
@@ -400,22 +402,22 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     old_cars = old_cars[old_cars['Status in H2R'] == 'active']
 
-
+    
     #check to know where is in query
     old_cars['VIN Bayer in Monsanto H2R report (P08)'] = np.where((old_cars['System in H2R'] == 'P08') & (old_cars['Monsanto_Bayer'] == 'Bayer'), "X", "")
     old_cars['VIN Monsanto in Bayer H2R report'] = np.where((old_cars['System in H2R'] != 'P08') & (old_cars['Monsanto_Bayer'] == 'Monsanto'), "X", "")
 
 
-
+    
     for i in old_cars.columns[19:26]:
         del(old_cars[i])
 
-
+    
     # delete blank spaces for cc
     old_cars['Cost Center'] = old_cars['Cost Center'].replace(' ', '', regex=True)
 
 
-
+    
     old_cars['Payments (monthly)'].fillna(0, inplace=True)
     old_cars['FLIX Base rent'] = old_cars['Payments (monthly)']
     old_cars['FLIX End Date'] = old_cars['Contract End Date']
@@ -471,7 +473,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
-
+    
     # assign SSC
 
 
@@ -486,15 +488,14 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(old_cars['SSC'])
     old_cars = old_cars.merge(df_ssc, how='left', left_on= 'LE', right_on= 'LE', copy=False)
 
-
+    
     # delete blank spaces for cc
     old_cars['FLIX CC'] = old_cars['FLIX CC'].replace(' ', '', regex=True)
     old_cars['Cost Center'] = old_cars['Cost Center'].replace(' ', '', regex=True)
 
 
-
+    
     old_cars_final = old_cars[['Brand', 'Car Policy Type', 'Contract Start Date', 'Contract End Date', 'Contract Status', 'Contract Duration(Months)', 'Cost Center', 'Division / Subgroup', 'License Number', 'Model', 'Payments (monthly)', 'Currency', 'VIN', 'Country', 'Lessor', 'Company Code', 'Legal Entity', 'NewOldMarker', 'Monsanto_Bayer', 'System in H2R', 'Status in H2R', 'VIN Bayer in Monsanto H2R report (P08)', 'VIN Monsanto in Bayer H2R report', 'Base rent in H2R', 'FLIX Base rent', 'Diff Base rent', 'Diff Base rent to EUR', 'End date from H2R', 'FLIX End Date', 'Differences End Date in days', 'Currency FLIX', 'Currency in H2R', 'check currency', 'Cost Center in H2R', 'FLIX CC', 'Differences of CC', 'FLIX LE', 'LE from H2R', 'Diff LE', 'Correction base rent', 'Correction end date', 'Correction should be done', 'LE', 'SSC', 'FO action', 'User', 'Correction done', 'type of correction', 'IBR change']]
-   
 
     return new_cars, old_cars_final, currentMonth, currentYear
 
@@ -525,8 +526,8 @@ def uploader():
         df_query = pd.DataFrame()
         fo = request.files.getlist('query_folder')
         for  i in fo:
-            data_ = pd.read_excel(i, engine='openpyxl')
-            #data_ = pd.read_excel(i)
+            #data_ = pd.read_excel(i, engine='openpyxl')
+            data_ = pd.read_excel(i)
             df_query = df_query.append(data_)
         df_le = request.files['le_report']
         df_le = pd.read_excel(df_le, header = 10)
@@ -568,10 +569,7 @@ def uploader():
 
         writer.save()
         writer.close()              
-        
-        
-        return render_template('output_page.html')
-        """
+
         r = make_response(out.getvalue())
 
         r.headers["Content-Disposition"] = "attachment; filename=Cars_Report_ToAsk.xlsx"
@@ -579,7 +577,7 @@ def uploader():
 
         return  r
 
-        
+        """
         return render_template('output_page.html', new_cars=new_cars, old_cars_final=old_cars_final) 
         
         
@@ -635,7 +633,7 @@ def Download(new_cars, old_cars_final):
 
         return  r
 
-
+"""
 
 @app.errorhandler(404)
 def page_not_found(err):
@@ -650,7 +648,7 @@ def handle_exception(e):
         return e
     # now you're handling non-HTTP exceptions only
     return render_template("script_failed.html", e=e), 500
-"""
+
 
 
 if __name__ == '__main__':
