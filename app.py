@@ -21,11 +21,21 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     if date.today().day < 22:
         base_month = date.today().month - 2
         version_ = "V.2"
-        
+
     if base_month == 0:
+        currentMonthName = calendar.month_name[12]
         currentMonth = '12'
         currentYear = str(date.today().year - 1)
+    elif base_month < 0:
+        if version_ == "V.1":
+            base_month = 12
+        else:
+            base_month = 11
+        currentMonthName = calendar.month_name[base_month]    
+        currentMonth = str(base_month).zfill(2)
+        currentYear = str(date.today().year - 1)
     else:
+        currentMonthName = calendar.month_name[base_month]
         currentMonth = str(base_month).zfill(2)
         currentYear = str(date.today().year)
 
@@ -36,14 +46,13 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
   
-    path_statics = ".\\Script\\Statics_file\\"
+    path_statics = ".\\Statics_file\\"
 
 
     df_usa = pd.read_excel(path_statics + 'USA CC APPROACH.xlsx')
     df_ssc = pd.read_excel(path_statics + 'SAP-LE.xlsx', sheet_name= 'Company Codes')
     df_ag = pd.read_excel(path_statics + 'AG cars.xlsx')
-
-
+    df_md_costcenter = pd.read_excel(path_statics + 'SAP-LE.xlsx', sheet_name= 'Cost Center 07.2022')
 
     
     
@@ -61,6 +70,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
         df_query = df_query[header_n + 1:] 
         df_query.columns = new_header
         df_query = df_query.reset_index(drop=True)
+        #df_query = df_query.reindex(df_query.index.drop(0)).reset_index(drop=True)
         df_query.columns.name = None
     df_query = df_query[relevant_col_query]
     drop_condition_query = df_query[(df_query['VIN'] == 'VIN') | (df_query['VIN'].isnull())].index
@@ -68,7 +78,7 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     df_query = df_query.reset_index(drop=True)
 
 
-    # Before format company code, identify null company code and date
+        # Before format company code, identify null company code and date
     df['Null Company Code'] = np.where(df['Company Code'].isnull(), "X", "")
 
     df['End_year'] =  pd.to_numeric(df['Contract End Date'].str[-4:], downcast='integer')
@@ -84,7 +94,6 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(df['Start_year'])
 
 
-
     df[['Payments (monthly)']] = df[['Payments (monthly)']].astype(str)
     df['Payments (monthly)'] = df[['Payments (monthly)']].applymap(lambda x: str(x.replace(',','.')))
     df[['Payments (monthly)']] = df[['Payments (monthly)']].astype(float)
@@ -95,35 +104,31 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     df_usa['Ccode'] = df_usa['Ccode'].str.zfill(4)
     df['Contract Duration(Months)'].fillna(0, inplace=True)
     df['Contract Duration(Months)'] = df['Contract Duration(Months)'].astype(int)
-    df['Contract Start Date'] = pd.to_datetime(df['Contract Start Date'],infer_datetime_format = True)                                         
-    df['Contract End Date'] = pd.to_datetime(df['Contract End Date'],infer_datetime_format = True) 
-    df_query['Start Date'] = pd.to_datetime(df_query['Start Date'],infer_datetime_format = True)
-    df_query['End Date'] = pd.to_datetime(df_query['End Date'],infer_datetime_format = True)
+    df['Contract Start Date'] = pd.to_datetime(df['Contract Start Date'],infer_datetime_format = True, dayfirst=True)                                         
+    df['Contract End Date'] = pd.to_datetime(df['Contract End Date'],infer_datetime_format = True, dayfirst=True) 
+    df_query['Start Date'] = pd.to_datetime(df_query['Start Date'],infer_datetime_format = True, dayfirst=True)
+    df_query['End Date'] = pd.to_datetime(df_query['End Date'],infer_datetime_format = True, dayfirst=True)
     df_query.rename(columns={payment_col : 'Payments'}, inplace=True)
     #df_query.columns = [*df_query.columns[:-1], 'Payments']
     df_query['Legal Entity'] = df_query['Legal Entity'].astype(str)
     df_query['Legal Entity'] = df_query['Legal Entity'].str.split('.').str[0]
     df_query['Legal Entity'] = df_query['Legal Entity'].str.zfill(4)
-    df_currency.columns = [*df_currency.columns[:-1], 'Rates']
-
-
+    df_currency = df_currency[df_currency[df_currency.columns[2]] == currentMonthName][[df_currency.columns[0], df_currency.columns[1], df_currency.columns[4]]]
+    df_currency.columns = ['ISO', *df_currency.columns[1:2], 'Rates']
 
     # create dictionary for currency rates --------------- calculate difference with exchange rates
     currency_dict = dict(zip(df_currency['ISO'], df_currency['Rates']))
 
-    
-    # ## Manipulation
 
-    
     # #### Change all German LE to LE2000
-
 
     df['Country'][df['Company Code'] == '2000'] = 'DE'
     df['Cost Center'][df['Company Code'] == '2000'] = ''
     df['Division / Subgroup'][df['Company Code'] == '2000'] = ''
 
-    
     # ### Look for missing values
+
+
 
     df['Payments missing'] = np.where((df['Payments (monthly)'].isnull()) | (df['Payments (monthly)'] <= 0), 'X', '')
 
@@ -132,33 +137,28 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     df['Start/End missing '] = np.where(df['Contract Start Date'].isnull() | df['Contract End Date'].isnull() , 'X', '')
 
-    
     # ### Delete those obsolete Company Code from LE list dataframe
 
 
-    df_le['CCode'] = df_le['CCode'].str[1:5]
-    df_le_obsolete = df_le[df_le['CA'] == 'B']
-    df_le_valid = df_le[df_le['CA'] == 'A']
 
 
-    df = df[-df['Company Code'].isin(df_le_obsolete['CCode'])]
+    # Tengo que reemplazar aca  y luego modificar mas abajo, eso seria todo con respecto al nuevo gdis
 
-    
+    df_le_obsolete = df_le[df_le['Group Status'] != 'Group Companies (A)']
+    df_le_valid = df_le[df_le['Group Status'] == 'Group Companies (A)']
+
+    df = df[-df['Company Code'].isin(df_le_obsolete['Company code'])]
+
     #  Exclude AG cars
-
 
     df_ag['VIN'] = df_ag['Contract ID'].str[-17:]
     df = df[-df['VIN'].isin(df_ag['VIN'])]
 
-
-    
     # ### Removing values
-
 
     df = df[(df['Car Policy Type'] != 'Employee Model') & (df['Car Policy Type'] != 'Pharmacy Car')]
     df = df[(df['Lessor'] != 'Allowance Car') & (df['Lessor'] != 'Wheels')]
     df = df[(df['Country'] != 'JP') & (df['Country'] != 'LV') & (df['Country'] != 'EE')]
-
 
     df['Contract Start Date'][(df['Contract Start Date'] < '2021-01-01') & (df['Country'] == 'CA')] = datetime.datetime(2021, 1, 1)
     df['Contract Start Date'][(df['Contract Start Date'] < '2020-09-01') & (df['Country'] == 'HU')] = datetime.datetime(2020, 9, 1)
@@ -168,26 +168,28 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     df['Company Code'][df['Country'] == 'TU'].fillna('0085', inplace = True) 
     df['Country'] = np.where(df['Country'] == 'TU', 'MA', df['Country'])
+    """
+    df = df[(df['Company Code'] != '1925') | (df['Company Code'] != '2476')]
+    #df = df[(df['Country'] != 'CZ') & (df['Country'] != 'SK')]
+    df = df[(df['Company Code'] != '1000') | (df['Company Code'] != '0807')]
+    """
+    df = df[df['Company Code'] != '1925']
+    df = df[df['Company Code'] != '2476']
+    df = df[df['Company Code'] != '1000']
+    df = df[df['Company Code'] != '0807']
 
-    df = df[(df['Company Code'] != '1925') & (df['Company Code'] != '2476')]
-    df = df[(df['Country'] != 'CZ') & (df['Country'] != 'SK')]
+    df[df['Company Code'] == '1925']
 
-
-    
     # #### Change CC according table
-
 
     df['Cost Center'][df['Company Code'] == '0201'] = 'SZBSCS9007'
     df['Cost Center'][df['Company Code'] == '1611'] = 'VQ62600002'
-    df['Cost Center'][df['Company Code'] == '1994'] = '6Z90910002'
+    df['Cost Center'][df['Company Code'] == '1994'] = '6Z90910002' 
 
-    
     # #### Check currency and amounts
-
 
     # replace currency for Chile CLP instead of CPL
     df['Currency'] = np.where(((df['Country'] == 'CL') & (df['Currency'] == 'CPL')), 'CLP', df['Currency'])
-
 
     #convert payments in EUR and then check if are higher than 1k, also checking the VIN lenght and currency for British cars
     df['Payments (monthly) in EUR'] = df['Payments (monthly)'] / [currency_dict[x] if ((x != 'EUR') & (x != 'na')) else 1 for x in df['Currency']]
@@ -196,16 +198,12 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     df['Wrong VIN'] = np.where((df['VIN'].apply(lambda x: len(x) < 17)) & (-df['Country'].isin(['TW', 'PK', 'PE', 'PH', 'MA', 'BD'])), 'X', '')
     del(df['Payments (monthly) in EUR'])
 
-
     # delete blank spaces for cc
     df['Cost Center'] = df['Cost Center'].replace(' ', '', regex=True)
 
-
     pd.set_option('display.max_columns', None)
 
-    
     # #### Change USA companies
-
 
     ccode_list = df_usa['Ccode']
     cc_list = df_usa['Cost Center']
@@ -217,12 +215,9 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     df['Company Code'][df['Company Code'].isin(ccode_list)] = '1372'
 
-    
     # ### Combine with Query
 
-
-    df_query['LE_VIN'] = df_query['Legal Entity'] + '_' + df_query['VIN']  
-
+    df_query['LE_VIN'] = df_query['Legal Entity'] + '_' +df_query['VIN']  
 
     # combine with vin and LE
     df_query['Payments'].fillna(0, inplace=True)
@@ -232,35 +227,28 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     df['Exact Car Exist in H2R'] = np.where(df['VIN'].isin(vin_list), "X", "")
 
-   
-
+    #df['Exact Car Exist in H2R'] = np.where((df['Company Code'] + '_' + df['VIN']).isin(le_vin_list), "X", "")
 
     # Here I create a new DF with those that not appear in the query
     new_cars = df[df['Exact Car Exist in H2R'] == ""]
     old_cars = df[df['Exact Car Exist in H2R'] == "X"]
-
 
     # If the duration is shorter than 12 months (include) we should exclude them --> New Cars
     cond_for_old_contracts = (((new_cars['Contract End Date'].dt.month > datetime.datetime.now().month) & (new_cars['Contract End Date'].dt.year == datetime.datetime.now().year)) | (new_cars['Contract End Date'].dt.year > datetime.datetime.now().year))
     new_cars = new_cars[cond_for_old_contracts]
     new_cars = new_cars[new_cars['Contract Duration(Months)'] > 12]
 
-
     # Take out those vehicules with null cc, company code o payments --> New Cars
     #new_cars = new_cars[-((new_cars['Company Code'].isnull()) | (new_cars['Cost Center'].isnull()) | (new_cars['Payments (monthly)'].isnull()))]
 
 
-    
     # # NEW CARS MANIPULATION
 
-    
     # ### Combine CC with new cars data frame
-
 
     cc_dict_DE = {'UI20792610' : 'CF', 'UI20792620' : 'Employee cars = out of scope', 'UIX0000005' : 'CS', 'UIX0000006' : 'PH', 'UIX0000007' : 'CH', 'UIX0000008' : 'PH', 'UIX0000009' : 'CS', 'UIX0000010' : 'PH', 'UIX0000013' : 'CS'}
     cc_list_DE = list(cc_dict_DE.keys())
     available_division = ['CS', 'PH', 'CH', 'CF', 'BS', 'CP']
-
 
     # give format to df cost center
     columns_to_drop = []
@@ -273,7 +261,6 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     if ((len(df_cost_center.iloc[0,0]) >= 14) & (len(df_cost_center.iloc[0,1]) == 10)):
         df_cost_center.rename(columns= {df_cost_center.columns[0] : 'VIN_No'}, inplace = True)
         df_cost_center.rename(columns= {df_cost_center.columns[1] : 'Cost_Center_Car'}, inplace = True)
-
 
 
     # Replace CC from DE that appear in our cc list, if they don't an X will be placed on "Wrong Cost Center"
@@ -289,7 +276,6 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(new_cars['Cost_Center_Car'])
     del(new_cars['Exact Car Exist in H2R'])
 
-   
     # Assign division based on CC
     new_cars['new division'] = new_cars[new_cars['Wrong_Cost_Center'] == ""]['Cost Center'].map(cc_dict_DE)
     new_cars['Division / Subgroup'] = np.where(new_cars['new division'].isnull(), new_cars['Division / Subgroup'], new_cars['new division'])
@@ -300,11 +286,9 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(new_cars['new division'])
     #new_cars['Wrong Division'] = np.where(new_cars['Division / Subgroup'].isin(available_division), "", "X")
 
-   
     # delete blank spaces for cc
     new_cars['Cost Center'] = new_cars['Cost Center'].replace(' ', '', regex=True)
 
-   
     # define Wrong LE in Report
 
 
@@ -320,7 +304,6 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     del(new_cars['cc_2digits'])
 
-   
     # Last changes in company code
 
     new_cars['Company Code'] =  np.where((new_cars['Country'] == 'DE') & (new_cars["Monsanto_Bayer"] != 'Monsanto'), '2000', new_cars['Company Code'])
@@ -328,21 +311,45 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
-   
+    new_cars['Company Code'].str.count("D")
+
+    #new_cars[new_cars['Non existing Company Code'] == "X"]
+
+    df_le[df_le['Company code'] == '2608']
+
     monsanto_cc_list = ['2600', '2601', '2602', '2603', '2604', '2606', '2608', '2609', '2610', '2611', '2613', '2614', '2615', '2616', '2617', '2618', '2619', '2620', '2621', '2622', '2624', '2625', '2626', '2628', '2629', '2630', '2631', '2632', '2633', '2634', '2635', '2637', '2638', '2640', '2641', '2642', '2643', '2644', '2645', '2646', '2647', '2648', '2649', '2650', '2651', '2653', '2654', '2656', '2657', '2658', '2659', '2660', '2661', '2662', '2663', '2664', '2665', '2666', '2667', '2668', '2669', '2670', '2671', '2672', '2673', '2674', '2675', '2676', '2677', '2678', '2680', '2681', '2682', '2683', '2684', '2685', '2687', '2688', '2689', '2690', '2694', '2723', '2724', '2725', '2726', '2730', '2740', '2741', '2744', '2745', '2746', '2747']
 
-    new_cars['Non existing Company Code'] = np.where(new_cars['Company Code'].isin(df_le_valid['CCode']), "", np.where(new_cars['Null Company Code'] == "X", "", "X"))
+    #new_cars['Non existing Company Code'] = np.where(new_cars['Company Code'].isin(df_le_valid['CCode']), "", np.where(new_cars['Null Company Code'] == "X", "", "X"))
+
+    new_cars['Non existing Company Code'] = np.where(new_cars['Company Code'].isin(df_le_valid['Company code']), "", np.where(new_cars['Null Company Code'] == "X", "", "X"))
 
 
     new_cars['Company Code'] =  np.where(new_cars['Company Code'].isin(monsanto_cc_list), "D" + new_cars['Company Code'], new_cars['Company Code'])
 
 
-    
+
+    new_cars['Missing'] = np.where(new_cars[new_cars.columns[19:30].to_list()].eq('X').any(1, skipna=True), 'X', '')
+
+    # We add 2 columns to indicate system
+    df_md_costcenter = df_md_costcenter[['LE', 'CC', 'SAP']]
+    df_md_costcenter['LE'] = [x if x[0] != 'D' else x[1:5] for x in df_md_costcenter['LE']]
+    df_md_costcenter['LE_CC_'] = df_md_costcenter['LE'] + '_' + df_md_costcenter['CC']
+
+    new_cars['LE_CC'] = new_cars['Company Code'] + '_' + new_cars['Cost Center']
+
+    new_cars = new_cars.merge(df_md_costcenter[['LE_CC_', 'SAP']], how='left', left_on= 'LE_CC', right_on= 'LE_CC_',copy=True)
+    new_cars.drop('LE_CC', axis=1, inplace=True)
+    new_cars.drop('LE_CC_', axis=1, inplace=True)
+    new_cars = new_cars.rename(columns={'SAP' : 'SAPSystem_from_CC'})
+
+
+    new_cars = new_cars[['Brand', 'Car Policy Type', 'Contract Start Date', 'Contract End Date', 'Contract Status', 'Contract Duration(Months)', 'Cost Center', 'Division / Subgroup', 'License Number', 'Model', 'Payments (monthly)', 'Currency', 'VIN', 'Country', 'Lessor', 'Company Code', 'Legal Entity', 'NewOldMarker', 'Monsanto_Bayer', 'SAPSystem_from_CC', 'Null Company Code', 'Payments missing', 'Ended in the past', 'Start/End missing ', 'GB Car not in GBP', 'Amount higher than 1K', 'Wrong VIN', 'Wrong_Cost_Center', 'Wrong BAYER LE in Report', 'Wrong MONSANTO LE in Report', 'Non existing Company Code', 'Missing']]
+
+    new_cars.head()
+
     # 
 
-    
     # # OLD CARS MANIPULATION
-
 
     # add cost center to LE 2000
     old_cars['Company Code'] =  np.where((old_cars['Country'] == 'DE') & (old_cars["Monsanto_Bayer"] != 'Monsanto'), '2000', old_cars['Company Code'])
@@ -357,11 +364,9 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(old_cars['Cost_Center_Car'])
     del(old_cars['VIN_No'])
 
-    
     #replace 6011 with 2611
     old_cars['Company Code']= np.where(old_cars['Company Code'] == '6011', '2611', old_cars['Company Code'])
 
-    
     old_cars['LE_VIN'] = old_cars['Company Code'] + '_' + old_cars['VIN'] 
 
     df_query_tomerge = df_query[['VIN', 'LE_VIN', 'Legal Entity', 'Status', 'SAP Cost Center', 'End Date', 'Payments', 'Currency', 'System']]
@@ -376,12 +381,10 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
-    
     # delete those car not active (leaving those that doesn't match by cocode)
 
     old_cars = old_cars[((old_cars['Status in H2R'] == 'active') | old_cars['Status in H2R'].isnull())]
 
-    
     # refill those null values
     null_values_old_cars = old_cars[old_cars['Status in H2R'].isnull()]
     old_cars = old_cars[-(old_cars['Status in H2R'].isnull())]
@@ -402,22 +405,18 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
     old_cars = old_cars[old_cars['Status in H2R'] == 'active']
 
-    
     #check to know where is in query
     old_cars['VIN Bayer in Monsanto H2R report (P08)'] = np.where((old_cars['System in H2R'] == 'P08') & (old_cars['Monsanto_Bayer'] == 'Bayer'), "X", "")
     old_cars['VIN Monsanto in Bayer H2R report'] = np.where((old_cars['System in H2R'] != 'P08') & (old_cars['Monsanto_Bayer'] == 'Monsanto'), "X", "")
 
 
-    
     for i in old_cars.columns[19:26]:
         del(old_cars[i])
 
-    
     # delete blank spaces for cc
     old_cars['Cost Center'] = old_cars['Cost Center'].replace(' ', '', regex=True)
 
 
-    
     old_cars['Payments (monthly)'].fillna(0, inplace=True)
     old_cars['FLIX Base rent'] = old_cars['Payments (monthly)']
     old_cars['FLIX End Date'] = old_cars['Contract End Date']
@@ -473,7 +472,6 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
 
 
 
-    
     # assign SSC
 
 
@@ -488,16 +486,25 @@ def process_data(df_query, df, df_currency, df_le, df_cost_center):
     del(old_cars['SSC'])
     old_cars = old_cars.merge(df_ssc, how='left', left_on= 'LE', right_on= 'LE', copy=False)
 
-    
     # delete blank spaces for cc
     old_cars['FLIX CC'] = old_cars['FLIX CC'].replace(' ', '', regex=True)
     old_cars['Cost Center'] = old_cars['Cost Center'].replace(' ', '', regex=True)
 
 
-    
     old_cars_final = old_cars[['Brand', 'Car Policy Type', 'Contract Start Date', 'Contract End Date', 'Contract Status', 'Contract Duration(Months)', 'Cost Center', 'Division / Subgroup', 'License Number', 'Model', 'Payments (monthly)', 'Currency', 'VIN', 'Country', 'Lessor', 'Company Code', 'Legal Entity', 'NewOldMarker', 'Monsanto_Bayer', 'System in H2R', 'Status in H2R', 'VIN Bayer in Monsanto H2R report (P08)', 'VIN Monsanto in Bayer H2R report', 'Base rent in H2R', 'FLIX Base rent', 'Diff Base rent', 'Diff Base rent to EUR', 'End date from H2R', 'FLIX End Date', 'Differences End Date in days', 'Currency FLIX', 'Currency in H2R', 'check currency', 'Cost Center in H2R', 'FLIX CC', 'Differences of CC', 'FLIX LE', 'LE from H2R', 'Diff LE', 'Correction base rent', 'Correction end date', 'Correction should be done', 'LE', 'SSC', 'FO action', 'User', 'Correction done', 'type of correction', 'IBR change']]
 
+
+
+    #Round decimals
+
+    columns_to_round = ['Base rent in H2R', 'FLIX Base rent',	'Diff Base rent', 'Diff Base rent to EUR']
+
+    for col in columns_to_round:
+        old_cars_final[col] = round(old_cars_final[col], 2)
+
+
     return new_cars, old_cars_final, currentMonth, currentYear
+
 
 
 ##############################################################################################################################################################################
@@ -523,19 +530,27 @@ def uploader():
     if request.method == "POST":
         df = request.files['fleet_report']
         df = pd.read_csv(df)
+        
         df_query = pd.DataFrame()
         fo = request.files.getlist('query_folder')
         for  i in fo:
             #data_ = pd.read_excel(i, engine='openpyxl')
             data_ = pd.read_excel(i)
             df_query = df_query.append(data_)
+
+
+
+
         df_le = request.files['le_report']
-        df_le = pd.read_excel(df_le, header = 10)
+        #df_le = pd.read_excel(df_le, header = 10)
+        df_le = pd.read_excel(df_le, header=36, usecols=['Company code', 'Country', 'Group Status'])
         df_currency = request.files['currency_report']
-        df_currency = pd.read_excel(df_currency, header=0)
+        #df_currency = pd.read_excel(df_currency, header=0)
+        df_currency = pd.read_excel(df_currency, sheet_name="Sheet1")
         df_cost_center = request.files['fie_report']
         df_cost_center = pd.read_excel(df_cost_center)
-        
+        print("hola")
+        print(df_currency.head())
         
 
         new_cars, old_cars_final, currentMonth, currentYear = process_data(df_query=df_query, df=df, df_currency=df_currency, df_le=df_le, df_cost_center=df_cost_center)
@@ -577,63 +592,8 @@ def uploader():
 
         return  r
 
-        """
-        return render_template('output_page.html', new_cars=new_cars, old_cars_final=old_cars_final) 
-        
-        
-        r = make_response(out.getvalue())
-
-        
-
-        r.headers["Content-Disposition"] = "attachment; filename=Cars_Report_ToAsk.xlsx"
-        r.headers["Content-type"] = "application/x-xls"
-
-        return  r 
-        """
-
-"""
-@app.route("/output_download", methods=['POST'])
-def Download(new_cars, old_cars_final):
-    if request.method == "POST":
-
-        out = io.BytesIO()
-
-        writer = pd.ExcelWriter(out, engine='xlsxwriter', datetime_format='yyyy-mm-dd')
-        
-        new_cars.to_excel(writer, index=False, header=True, sheet_name='New Cars')
-        old_cars_final.to_excel(writer, index=False, header=True, sheet_name='Corrections')
 
 
-        # Get the dimensions of the dataframe
-        (max_row_old, max_col_old) = old_cars_final.shape
-        (max_row_new, max_col_new) = new_cars.shape
-
-        # Make the columns wider for clarity.
-        writer.sheets['New Cars'].set_column(0,  max_col_new - 1, 20)
-        writer.sheets['Corrections'].set_column(0,  max_col_old - 1, 20)
-
-
-        # Set the autofilter.
-        writer.sheets['Corrections'].autofilter(0, 0, max_row_old, max_col_old - 1)
-        writer.sheets['New Cars'].autofilter(0, 0, max_row_new, max_col_new - 1)
-
-
-        # Number format
-        format1 = writer.book.add_format({'num_format': '0.00'})
-        writer.sheets['Corrections'].set_column('AA:AA', None, format1)
-
-
-        writer.save()
-        writer.close()              
-
-        r = make_response(out.getvalue())
-
-        r.headers["Content-Disposition"] = "attachment; filename=Cars_Report_ToAsk.xlsx"
-        r.headers["Content-type"] = "application/x-xls"
-
-        return  r
-
-"""
 
 @app.errorhandler(404)
 def page_not_found(err):
@@ -650,7 +610,5 @@ def handle_exception(e):
     return render_template("script_failed.html", e=e), 500
 
 
-
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
-
