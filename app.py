@@ -600,7 +600,7 @@ def page_not_found(err):
     return render_template('page_not_found.html'), 404
 
 
-"""
+
 @app.errorhandler(Exception)
 def handle_exception(e):
     # pass through HTTP errors
@@ -609,7 +609,6 @@ def handle_exception(e):
     # now you're handling non-HTTP exceptions only
     return render_template("script_failed.html", e=e), 500
 
-"""
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
